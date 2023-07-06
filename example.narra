@@ -1,0 +1,24 @@
+@declare <<
+fn my_func()
+{
+    print("Nothing, Nowhere.");
+}
+>>
+
+
+@tree main
+#color:12 #id:25 Bob:"test111" 
+-> @eval <<my_func();>>
+-> #color:24 Ayaya: "AYAYAY"
+-> @choice
+|"Go right"| "You went right" -> @jump right -> "We came back from the jump"
+|"Go left"| "You went left"
+|"Go up"| "You went up" -> @jump up
+;
+-> Arnold : "Bob"
+
+@tree right
+#id:"ayright" Bob : "Good on you for choosing right"
+
+@tree up
+Bob : "Good on you for choosing up"

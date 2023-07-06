@@ -1,13 +1,11 @@
-use js_sandbox::Script;
-use json::ser::PrettyFormatter;
 use serde_json as json;
 use std::fs::{self, File};
 // rhai
-use rhai::{Engine, EvalAltResult, Scope, AST};
+use rhai::{Engine, Scope, AST};
 // ss
-use rand::Rng;
-use regex::Regex;
-use std::collections::HashMap;
+// use rand::Rng;
+// use regex::Regex;
+// use std::collections::HashMap;
 use std::io::{self, BufRead, Read};
 use std::path::Path;
 
@@ -145,11 +143,8 @@ impl NarraRuntime {
         // println!("SPLIT 1 \n {} \n \n", split_file[1]);
 
         // Parse NARRA file
-        let code: &'static str = include_str!("parser.js");
-        let mut script = Script::from_string(code).expect("init succeeds");
-        let result: json::Value = script.call("parser.parse", &split_file[1]).unwrap();
-        fs::write("./narraast", &result.to_string()).unwrap();
-        self.set_narra_file(result);
+
+        self.set_narra_file(json::to_value(&split_file[1]).unwrap());
         self.rhai_ast = self
             .engine
             .compile_with_scope(&mut self.scope, &split_file[0])
@@ -274,63 +269,63 @@ impl NarraRuntime {
     }
 }
 
-fn preprocess_narra<P>(filename: P) -> io::Result<(String, HashMap<String, String>, String)>
-where
-    P: AsRef<Path>,
-{
-    let mut file = fs::File::open(&filename)?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)?;
+// fn preprocess_narra<P>(filename: P) -> io::Result<(String, HashMap<String, String>, String)>
+// where
+//     P: AsRef<Path>,
+// {
+//     let mut file = fs::File::open(&filename)?;
+//     let mut content = String::new();
+//     file.read_to_string(&mut content)?;
 
-    // Get declaration :
-    let mut generated_script = "".to_string();
+//     // Get declaration :
+//     let mut generated_script = "".to_string();
 
-    let declare_re = Regex::new(r"(?s)@declare\s*<<(.*?)>>").unwrap();
-    for cap in declare_re.captures_iter(&content.clone()) {
-        let code = &cap[1];
+//     let declare_re = Regex::new(r"(?s)@declare\s*<<(.*?)>>").unwrap();
+//     for cap in declare_re.captures_iter(&content.clone()) {
+//         let code = &cap[1];
 
-        generated_script += code;
-        // println!("-----------");
-        // println!("{}", generated_script);
-        // println!("-----------");
+//         generated_script += code;
+//         // println!("-----------");
+//         // println!("{}", generated_script);
+//         // println!("-----------");
 
-        // Replace SOME_CODE with the random name
-        content = content.replace(&cap[0], "");
-    }
+//         // Replace SOME_CODE with the random name
+//         content = content.replace(&cap[0], "");
+//     }
 
-    let mut code_map = HashMap::new();
-    let re = Regex::new(r"(?s)<<(.*?)>>").unwrap();
-    for cap in re.captures_iter(&content.clone()) {
-        let code = &cap[1];
+//     let mut code_map = HashMap::new();
+//     let re = Regex::new(r"(?s)<<(.*?)>>").unwrap();
+//     for cap in re.captures_iter(&content.clone()) {
+//         let code = &cap[1];
 
-        // Generate random name
-        let random_name: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(10)
-            .map(char::from)
-            .filter(|c| c.is_alphabetic())
-            .collect();
+//         // Generate random name
+//         let random_name: String = rand::thread_rng()
+//             .sample_iter(&rand::distributions::Alphanumeric)
+//             .take(10)
+//             .map(char::from)
+//             .filter(|c| c.is_alphabetic())
+//             .collect();
 
-        code_map.insert(random_name.clone(), code.to_string());
+//         code_map.insert(random_name.clone(), code.to_string());
 
-        // Replace SOME_CODE with the random name
-        content = content.replace(&cap[0], &format!("<<{}>>", random_name));
-    }
+//         // Replace SOME_CODE with the random name
+//         content = content.replace(&cap[0], &format!("<<{}>>", random_name));
+//     }
 
-    //println!("{}", content);
+//     //println!("{}", content);
 
-    Ok((content, code_map, generated_script))
-}
+//     Ok((content, code_map, generated_script))
+// }
 
-pub fn compile_narra_file<P>(filename: P) -> io::Result<(String)>
-where
-    P: AsRef<Path>,
-{
-    let (mut pure_narra, functions, mut generated_script) = preprocess_narra(filename)?;
+// pub fn compile_narra_file<P>(filename: P) -> io::Result<(String)>
+// where
+//     P: AsRef<Path>,
+// {
+//     let (mut pure_narra, functions, mut generated_script) = preprocess_narra(filename)?;
 
-    for (func_name, func_code) in functions {
-        generated_script += &format!("fn {}() \n{{\n{}\n}}\n", func_name, func_code);
-    }
-    // Consider compiling the "generated script" and returning that instead.
-    Ok(format!("{}\n<<--SPLIT-->>\n{}", generated_script, pure_narra).to_string())
-}
+//     for (func_name, func_code) in functions {
+//         generated_script += &format!("fn {}() \n{{\n{}\n}}\n", func_name, func_code);
+//     }
+//     // Consider compiling the "generated script" and returning that instead.
+//     Ok(format!("{}\n<<--SPLIT-->>\n{}", generated_script, pure_narra).to_string())
+// }
