@@ -156,7 +156,7 @@ Modifier "modifier"
 }
 
 Literal "literal"
-	= _ literal:[a-zA-Z]+ 
+	= _ literal:([a-zA-Z0-9]/"-"/"_")+ 
 { 
         return literal.join("");
 }

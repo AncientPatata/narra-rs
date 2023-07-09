@@ -1,24 +1,25 @@
 @declare <<
-fn my_func()
-{
-    print("Nothing, Nowhere.");
-}
+    let count = 0;
 >>
 
-
-@tree main
-#color:12 #id:25 Bob:"test111" 
--> @eval <<my_func();>>
--> #color:24 Ayaya: "AYAYAY"
--> @choice
-|"Go right"| "You went right" -> @jump right -> "We came back from the jump"
-|"Go left"| "You went left"
-|"Go up"| "You went up" -> @jump up
+@tree main 
+"You can't do that on television, said an old woman, her teeth seemingly falling out as she spoke."
+-> #color: 55 OldWoman : "Are you listening to what I'm saying ? Kids these days"
+-> "She shrugs and walks away, leaving you to your own devices."
+-> "What do you do ?"
+-> @choice 
+|"Look down"| "You look down, and see a small, black, leather-bound book."
+                -> #color:15 MC: "Where am I ?" -> "We looping" -> @jump loop -> "We're done looping"
+|"End it"| "You end it all, and jump off the bridge." -> @jump kysend
 ;
--> Arnold : "Bob"
 
-@tree right
-#id:"ayright" Bob : "Good on you for choosing right"
+@tree loop
+"Increased loop count"
+-> #id:"loop_inc" @eval <<count +=1>>
+-> @eval <<print(count);>>
+-> #id:"loop_cond" @eval <<if (count < 5) {script.jump("loop");} else {script.jump("kysend");} print("hello");>>
+-> @eval <<print("they see me looping")>>
 
-@tree up
-Bob : "Good on you for choosing up"
+@tree kysend
+"You've decided that pursuing this life is not worth it, and you jump off the bridge. Why put in the effort to understand the world, when you can just end it all ?"
+-> "Bad ending 1"

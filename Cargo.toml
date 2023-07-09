@@ -1,10 +1,10 @@
 [package]
-name = "NarraRust"
+name = "narra_rs"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-crate-type = ["cdylib"]
+# [lib]
+# crate-type = ["cdylib"]
 
 [dev-dependencies]
 js-sandbox = "0.1.6"

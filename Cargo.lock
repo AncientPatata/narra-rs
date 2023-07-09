@@ -3,20 +3,6 @@
 version = 3
 
 [[package]]
-name = "NarraRust"
-version = "0.1.0"
-dependencies = [
- "crossterm 0.26.1",
- "js-sandbox",
- "rand",
- "regex",
- "rhai",
- "serde",
- "serde_json",
- "terminal-menu",
-]
-
-[[package]]
 name = "ahash"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -394,6 +380,20 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys",
+]
+
+[[package]]
+name = "narra_rs"
+version = "0.1.0"
+dependencies = [
+ "crossterm 0.26.1",
+ "js-sandbox",
+ "rand",
+ "regex",
+ "rhai",
+ "serde",
+ "serde_json",
+ "terminal-menu",
 ]
 
 [[package]]

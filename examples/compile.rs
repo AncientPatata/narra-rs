@@ -7,6 +7,7 @@ use std::env;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::Path;
+use std::str::FromStr;
 
 fn preprocess_narra<P>(filename: P) -> io::Result<(String, HashMap<String, String>, String)>
 where
@@ -62,20 +63,21 @@ where
 {
     let (mut pure_narra, functions, mut generated_script) = preprocess_narra(filename)?;
 
-    for (func_name, func_code) in functions {
-        generated_script += &format!("fn {}() \n{{\n{}\n}}\n", func_name, func_code);
-    }
-
     let code: &'static str = include_str!("parser.js");
     let mut script = Script::from_string(code).expect("init succeeds");
     let result: json::Value = script.call("parser.parse", &pure_narra).unwrap();
+    let mut narra_str = result.to_string();
+    for (func_name, func_code) in functions {
+        let fson = json::json!({ "func_code": func_code });
+        //println!("FSON : {fson}");
+        let escaped_func = fson["func_code"].to_string();
+        let fescaped_func = escaped_func.get(1..(escaped_func.len() - 1)).unwrap();
+        //println!("STR_FROM_FSON : {fescaped_func}");
+        narra_str = narra_str.replace(&func_name, &fescaped_func);
+    }
+    //println!("{narra_str}");
     // Consider compiling the "generated script" and returning that instead.
-    Ok(format!(
-        "{}\n<<--SPLIT-->>\n{}",
-        generated_script,
-        &result.to_string()
-    )
-    .to_string())
+    Ok(format!("{}\n<<--SPLIT-->>\n{}", generated_script, &narra_str).to_string())
 }
 
 fn main() {
