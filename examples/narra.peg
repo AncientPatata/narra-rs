@@ -1,0 +1,265 @@
+{{
+function generateUUID() {
+    let uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        let r = Math.random() * 16 | 0,
+        v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+    return uuid;
+}
+
+}}
+
+start
+    = _ trees:(@TreeDefinition _ )+ { return trees}
+
+TreeDefinition
+	= "@tree" tree_name:Literal _ tree_body:TreeBody
+{
+	return {
+    	"tree":tree_name,
+        "tree_body":tree_body
+    }
+}
+
+TreeBody
+	= ActionSequence
+
+ActionSequence "action sequence"
+    = action_head:Action tail:(_ "->" _ @Action)*
+{
+    return [action_head].concat(tail)
+}
+
+Action "action"
+	= modifiers:Modifiers _ action_body:ActionBody
+{	
+    let id_modifier = modifiers.find(m => m.modifier === "id")
+    const {blocking, ...rest_action_body} = action_body;
+    let blocking_modifier = modifiers.find(m => m.modifier === "block")
+    let blocking_val = blocking === undefined? false : blocking 
+    if (blocking_modifier) {
+        blocking_val = blocking_modifier["value"]["value"]
+    }
+    return {
+        "modifiers":modifiers,
+        "action":rest_action_body,
+        "blocking": blocking_val,
+        "id": id_modifier? id_modifier["value"]["value"].toString() : generateUUID()
+    }
+}
+
+ActionBody "action body"
+    = DialogueAction / JumpAction / ReturnAction / MatchAction / ChoiceAction / EvalAction 
+    
+// Actions:
+
+EvalAction "evaluate action"
+	= "@eval" _ eval_value:Eval
+{
+	return {
+    	"action_type":"eval_action",
+        "blocking":false,
+        "eval_value": eval_value
+    }
+}/ "@@eval" _ eval_value:Eval
+{
+	return {
+    	"action_type":"eval_action",
+        "blocking": true,
+        "eval_value": eval_value
+    }
+}
+
+MatchAction "match action"
+    = "@match" _ match_value:(Value) _ match_body:(@MatchOption _)+ _ ";"
+{
+    return {
+    	"action_type":"match_action",
+        "blocking":false,
+        "match_value":match_value,
+        "match_body":match_body
+    }
+}
+
+MatchOption "match option"
+    = "|" [\r\t]* match_value:Value [\r\t]* "|" _ action_sequence:ActionSequence
+{
+    return {
+        "match_value":match_value,
+        "action_sequence": action_sequence
+    }    
+}
+
+ChoiceAction "choice action"
+    = "@choice" _ choice_body:(@ChoiceOption _)+ _ ";"
+{
+    return {
+    	"action_type":"choice_action",
+        "blocking":true,
+        "choice_body":choice_body
+    }
+}
+
+ChoiceOption "choice option"
+    = "|" [\r\t]* modifiers:Modifiers [\r\t]* choice_text:DialogueText [\r\t]* "|" _ action_sequence:ActionSequence
+{
+	let id_modifier = modifiers.find(m => m.modifier === "id");
+    return {
+        "choice_text":choice_text,
+        "modifiers":modifiers,
+        "action_sequence": action_sequence,
+        "id": id_modifier? id_modifier["value"]["value"].toString() : generateUUID()
+    }    
+}
+
+
+JumpAction "jump action"
+    = "@jump" _ jump_to:Literal
+{
+    return {
+    	"action_type":"jump_action",
+        "blocking":false,
+        "jump_to":jump_to
+    }
+}
+
+ReturnAction "return action"
+    = "@return" " "+ return_value:Value
+{
+    return {
+    	"action_type":"return_action",
+        "return_value":return_value
+    }
+}
+
+
+DialogueAction "dialogue action"
+    = _ dlg_text:DialogueText 
+{
+	return {
+    	"action_type":"dialogue_action",
+        "blocking":true,
+        "character_name":null,
+        "dialogue": dlg_text
+    }
+} 
+/ character_name:CharacterName _ ":" _ dialogue:DialogueText
+{
+    return {
+    	"action_type":"dialogue_action",
+        "character_name":character_name,
+        "dialogue":dialogue
+    }
+}
+
+CharacterName "character name"
+    = chars:([a-zA-Z])+ {return chars.join("")}
+
+DialogueText "dialogue text"
+    = String
+
+Modifiers "modifiers"
+	= modifiers:(_ @Modifier)*
+{
+	return modifiers
+}
+
+Modifier "modifier"
+	= "#" modifier_name:Literal _ ":" _ value:Value
+{
+	return {
+    	"modifier":modifier_name,
+        "value": value
+    }
+} / "#" modifier_name:Literal
+{
+    return {
+    	"modifier":modifier_name,
+        "value": true
+    }
+} / "#!" modifier_name:Literal
+{
+    return {
+    	"modifier":modifier_name,
+        "value": false
+    }
+}
+
+Literal "literal"
+	= _ literal:([a-zA-Z0-9]/"-"/"_")+ 
+{ 
+        return literal.join("");
+}
+
+Value "value"
+	= Boolean/ Variable / Integer/ String / Eval
+
+String "string"
+  =str1:BasicString _ "<>" _ str2:String
+{
+    return {
+        "value_type": "dynamic",
+        "type": "glued_string",
+        "str1": str1,
+        "str2": str2
+    }
+} / BasicString
+
+BasicString "basic string"
+    = _ QuotationMark chars:Char* QuotationMark 
+{ 
+   	return {
+        "value_type":"static",
+        "type": "string",
+        "value": chars.join("")
+    }
+} / Eval
+
+Variable "variable"
+	= _ literal:[a-zA-Z]+ 
+{ 
+        return {
+        "value_type":"dynamic",
+        "type": "literal",
+        "value": literal.join("")
+    }
+}
+
+Integer "integer"
+  	= _ [0-9]+ 
+{ 
+        return {
+        "value_type":"static",
+        "type": "int",
+        "value":parseInt(text(), 10)
+    }
+}
+Boolean "boolean"
+	= _ v:("true"/"false")
+{
+	return {
+        "value_type":"static",
+        "type": "bool",
+        "value":v === "true"
+    }
+}
+
+Eval "evaluation"
+    = _ "<<" _ code:[a-zA-Z0-9]+ _ ">>"
+{
+    return {
+        "value_type":"eval",
+        "func_id":code.join("")
+    }
+}
+
+_ "whitespace"
+  	= [ \t\n\r]*
+    
+Char
+  = [^\0-\x1F\x22\x5C]
+
+  
+QuotationMark "quotation mark"
+	= "\"" 

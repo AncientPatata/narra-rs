@@ -237,6 +237,7 @@ where
         self.currently_handled_action = action.clone();
         self.narra_state
             .push_action(action["id"].as_str().unwrap().to_string());
+        let modifiers = self.handle_modifiers(&action["modifiers"]);
         //println!("ACTION ::::::::::::::::::: \n {} \n", action);
         match action["action"]["action_type"].as_str().unwrap() {
             "dialogue_action" => self.handle_dialogue(action),
@@ -249,6 +250,14 @@ where
             }
             _ => println!("Unexpected action : {}", action),
         }
+        if modifiers.contains_key("blocking") {
+            if !modifiers["blocking"].as_bool().unwrap() {
+                self.handle_action();
+            }
+        }
+        // else {
+        //     self.handle_action();
+        // }
     }
 
     pub fn get_current_action(&mut self) -> json::Value {

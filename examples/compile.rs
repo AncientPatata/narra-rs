@@ -25,11 +25,7 @@ where
         let code = &cap[1];
 
         generated_script += code;
-        // println!("-----------");
-        // println!("{}", generated_script);
-        // println!("-----------");
 
-        // Replace SOME_CODE with the random name
         content = content.replace(&cap[0], "");
     }
 
@@ -52,8 +48,6 @@ where
         content = content.replace(&cap[0], &format!("<<{}>>", random_name));
     }
 
-    //println!("{}", content);
-
     Ok((content, code_map, generated_script))
 }
 
@@ -61,7 +55,7 @@ pub fn compile_narra_file<P>(filename: P) -> io::Result<(String)>
 where
     P: AsRef<Path>,
 {
-    let (mut pure_narra, functions, mut generated_script) = preprocess_narra(filename)?;
+    let (pure_narra, functions, generated_script) = preprocess_narra(filename)?;
 
     let code: &'static str = include_str!("parser.js");
     let mut script = Script::from_string(code).expect("init succeeds");
@@ -69,20 +63,19 @@ where
     let mut narra_str = result.to_string();
     for (func_name, func_code) in functions {
         let fson = json::json!({ "func_code": func_code });
-        //println!("FSON : {fson}");
         let escaped_func = fson["func_code"].to_string();
         let fescaped_func = escaped_func.get(1..(escaped_func.len() - 1)).unwrap();
-        //println!("STR_FROM_FSON : {fescaped_func}");
         narra_str = narra_str.replace(&func_name, &fescaped_func);
     }
-    //println!("{narra_str}");
-    // Consider compiling the "generated script" and returning that instead.
+
     Ok(format!("{}\n<<--SPLIT-->>\n{}", generated_script, &narra_str).to_string())
 }
 
 fn main() {
     let args: Vec<_> = env::args().collect();
-    if args.len() > 1 {
-        fs::write("./output_narra.nb", compile_narra_file(&args[1]).unwrap()).unwrap();
+    if args.len() > 2 {
+        fs::write(&args[2], compile_narra_file(&args[1]).unwrap()).unwrap();
+    } else {
+        fs::write("output_file.nb", compile_narra_file(&args[1]).unwrap()).unwrap();
     }
 }
