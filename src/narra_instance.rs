@@ -4,7 +4,8 @@ pub struct NarraInstance {
     pub action_stack: Vec<json::Value>,
     pub current_tree: String,
     pub narra_tree: json::Value,
-    end_of_file: bool,
+    pub end_of_file: bool,
+    pub blocked: bool,
 }
 
 impl NarraInstance {
@@ -14,6 +15,7 @@ impl NarraInstance {
             narra_tree: narra_json.clone(),
             action_stack: Vec::<json::Value>::new(),
             end_of_file: false,
+            blocked: true,
         };
         for obj in narra_json.as_array().unwrap() {
             if obj["tree"] == instance.current_tree {
@@ -31,6 +33,7 @@ impl NarraInstance {
             narra_tree: json::json!({}),
             action_stack: Vec::<json::Value>::new(),
             end_of_file: true,
+            blocked: false,
         }
     }
 
@@ -62,6 +65,7 @@ impl Clone for NarraInstance {
             current_tree: self.current_tree.clone(),
             narra_tree: self.narra_tree.clone(),
             end_of_file: self.end_of_file,
+            blocked: self.blocked,
         }
     }
 }

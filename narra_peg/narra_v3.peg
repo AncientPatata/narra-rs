@@ -155,9 +155,7 @@ DialogueAction "dialogue action"
 }
 
 CharacterName "character name"
-    = "_" chars:([a-zA-Z0-9]/" "/"'")* "_"  {
-        return chars.join("")
-    } / lit:[a-zA-Z]* {return lit.join("")}
+    = chars:([a-zA-Z])+ {return chars.join("")}
 
 DialogueText "dialogue text"
     = String

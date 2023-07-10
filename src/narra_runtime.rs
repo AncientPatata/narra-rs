@@ -43,26 +43,7 @@ where
     pub fn new(narra_event_handler: Rc<RefCell<T>>) -> NarraRuntime<T> {
         NarraRuntime {
             instance: NarraInstance::new(),
-            // default callbacks:
-            // dialogue_callback: |character, text, _| {
-            //     if character.is_none() {
-            //         println!("{}", text);
-            //     } else {
-            //         println!("{} : {}", character.unwrap(), text);
-            //     }
-            // },
-            // choice_callback: |choices, _| {
-            //     println!("Input in a number for a choice :");
-            //     let mut i = 1;
-            //     for choice in choices.clone() {
-            //         println!("{}. {}", i, choice);
-            //         i += 1;
-            //     }
-            //     let mut str_in: String = String::new();
-            //     io::stdin().read_line(&mut str_in);
-            //     println!("Selected : {}", str_in);
-            //     (str_in.trim_end().parse::<u32>().unwrap() - 1) as usize
-            // },
+
             narra_state: NarraState::new(),
             event_handler: narra_event_handler,
             engine: Engine::new(),
@@ -84,14 +65,6 @@ where
             .unwrap();
     }
 
-    // pub fn set_dialogue_callback(&mut self, callback: DialogueTextCallback) {
-    //     self.dialogue_callback = callback;
-    // }
-
-    // pub fn set_choice_callback(&mut self, callback: ChoiceCallback) {
-    //     self.choice_callback = callback;
-    // }
-
     pub fn set_narra_state(&mut self, new_state: NarraState) {
         self.narra_state = new_state;
     }
@@ -102,10 +75,6 @@ where
 
     pub fn read_file(&mut self, narra_file: String) {
         let split_file = narra_file.split("<<--SPLIT-->>").collect::<Vec<&str>>();
-        // println!("SPLIT 0 \n {} \n \n", split_file[0]);
-        // println!("SPLIT 1 \n {} \n \n", split_file[1]);
-
-        // Parse NARRA file
         let json_tree: json::Value = json::from_str(&split_file[1]).unwrap();
         self.instance = NarraInstance::from_json(&json_tree);
         self.rhai_ast = self
@@ -237,7 +206,7 @@ where
         self.currently_handled_action = action.clone();
         self.narra_state
             .push_action(action["id"].as_str().unwrap().to_string());
-        let modifiers = self.handle_modifiers(&action["modifiers"]);
+        let blocking = action["blocking"].is_boolean() && action["blocking"].as_bool().unwrap();
         //println!("ACTION ::::::::::::::::::: \n {} \n", action);
         match action["action"]["action_type"].as_str().unwrap() {
             "dialogue_action" => self.handle_dialogue(action),
@@ -250,14 +219,9 @@ where
             }
             _ => println!("Unexpected action : {}", action),
         }
-        if modifiers.contains_key("blocking") {
-            if !modifiers["blocking"].as_bool().unwrap() {
-                self.handle_action();
-            }
+        if !blocking {
+            self.handle_action();
         }
-        // else {
-        //     self.handle_action();
-        // }
     }
 
     pub fn get_current_action(&mut self) -> json::Value {
