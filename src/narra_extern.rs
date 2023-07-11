@@ -65,6 +65,28 @@ pub mod handle_module {
 
         Ok(())
     }
+
+    #[rhai_fn(return_raw)]
+    pub fn seen(
+        context: NativeCallContext,
+        handle: &mut Handle,
+        id: String,
+    ) -> Result<bool, Box<EvalAltResult>> {
+        // Double check the pointer is still fresh
+        // by comparing the handle's unique ID with
+        // the version stored in the engine's tag!
+        // if handle.unique_id() != context.tag().unwrap().as_int().unwrap() {
+        //     return "Ouch! The handle is stale!".into();
+        // }
+
+        // Get the reference to 'World'
+        let ninst: &mut NarraInstance = handle.as_mut();
+
+        // ... work with reference
+        let r = ninst.state.seen_action(id);
+
+        Ok(r)
+    }
 }
 
 pub fn register_narra_extern(engine: &mut rhai::Engine) {

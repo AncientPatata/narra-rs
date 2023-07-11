@@ -1,11 +1,14 @@
 use serde_json as json;
 
+use crate::narra_state::NarraState;
+
 pub struct NarraInstance {
     pub action_stack: Vec<json::Value>,
     pub current_tree: String,
     pub narra_tree: json::Value,
     pub end_of_file: bool,
     pub blocked: bool,
+    pub state: NarraState,
 }
 
 impl NarraInstance {
@@ -16,6 +19,7 @@ impl NarraInstance {
             action_stack: Vec::<json::Value>::new(),
             end_of_file: false,
             blocked: true,
+            state: NarraState::new(),
         };
         for obj in narra_json.as_array().unwrap() {
             if obj["tree"] == instance.current_tree {
@@ -34,6 +38,7 @@ impl NarraInstance {
             action_stack: Vec::<json::Value>::new(),
             end_of_file: true,
             blocked: false,
+            state: NarraState::new(),
         }
     }
 
@@ -54,7 +59,7 @@ impl NarraInstance {
     }
 
     pub fn eot(&self) -> bool {
-        self.action_stack.len() == 0
+        self.action_stack.len() == 0 || self.end_of_file
     }
 }
 
@@ -66,6 +71,7 @@ impl Clone for NarraInstance {
             narra_tree: self.narra_tree.clone(),
             end_of_file: self.end_of_file,
             blocked: self.blocked,
+            state: self.state.clone(),
         }
     }
 }

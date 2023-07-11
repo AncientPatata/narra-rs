@@ -16,6 +16,13 @@ impl NarraState {
         self.action_stack.push(action_id);
     }
 
+    pub fn seen_action(&self, action_id: String) -> bool {
+        self.action_stack
+            .iter()
+            .find(|x| x == &&action_id)
+            .is_some()
+    }
+
     pub fn save_action_history<P>(&self, file_path: P)
     where
         P: AsRef<Path>,

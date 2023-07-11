@@ -27,8 +27,6 @@ where
     // Tracking
     currently_handled_action: json::Value,
     //user_event: bool,
-    // Save state
-    narra_state: NarraState,
     // Code vars
     event_handler: Rc<RefCell<T>>,
     pub engine: Engine, // Engine for the Rhai document.
@@ -44,7 +42,6 @@ where
         NarraRuntime {
             instance: NarraInstance::new(),
 
-            narra_state: NarraState::new(),
             event_handler: narra_event_handler,
             engine: Engine::new(),
             scope: Scope::new(),
@@ -65,12 +62,16 @@ where
             .unwrap();
     }
 
+    pub fn add_plugin(&mut self, callback: fn(&mut Engine)) {
+        callback(&mut self.engine);
+    }
+
     pub fn set_narra_state(&mut self, new_state: NarraState) {
-        self.narra_state = new_state;
+        self.instance.state = new_state;
     }
 
     pub fn get_narra_state(&self) -> &NarraState {
-        &self.narra_state
+        &self.instance.state
     }
 
     pub fn read_file(&mut self, narra_file: String) {
@@ -202,25 +203,30 @@ where
     }
 
     pub fn handle_action(&mut self) {
-        let action = self.instance.action_stack.pop().unwrap();
-        self.currently_handled_action = action.clone();
-        self.narra_state
-            .push_action(action["id"].as_str().unwrap().to_string());
-        let blocking = action["blocking"].is_boolean() && action["blocking"].as_bool().unwrap();
-        //println!("ACTION ::::::::::::::::::: \n {} \n", action);
-        match action["action"]["action_type"].as_str().unwrap() {
-            "dialogue_action" => self.handle_dialogue(action),
-            "choice_action" => self.handle_choices(action),
-            "eval_action" => self.handle_eval(action),
-            "match_action" => self.handle_match(action),
-            "jump_action" => {
-                self.instance
-                    .perform_jump(action["action"]["jump_to"].as_str().unwrap().to_string());
+        if !self.instance.blocked {
+            let action = self.instance.action_stack.pop().unwrap();
+            self.currently_handled_action = action.clone();
+            self.instance
+                .state
+                .push_action(action["id"].as_str().unwrap().to_string());
+            let blocking = action["blocking"].is_boolean() && action["blocking"].as_bool().unwrap();
+            //println!("ACTION ::::::::::::::::::: \n {} \n", action);
+            match action["action"]["action_type"].as_str().unwrap() {
+                "dialogue_action" => self.handle_dialogue(action),
+                "choice_action" => self.handle_choices(action),
+                "eval_action" => self.handle_eval(action),
+                "match_action" => self.handle_match(action),
+                "jump_action" => {
+                    self.instance
+                        .perform_jump(action["action"]["jump_to"].as_str().unwrap().to_string());
+                }
+                "end_action" => self.instance.end_of_file = true,
+
+                _ => println!("Unexpected action : {}", action),
             }
-            _ => println!("Unexpected action : {}", action),
-        }
-        if !blocking {
-            self.handle_action();
+            if !blocking {
+                self.handle_action();
+            }
         }
     }
 
