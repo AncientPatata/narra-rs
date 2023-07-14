@@ -1,94 +1,25 @@
 use crate::narra_instance::NarraInstance;
-/// Newtype wrapping a reference (pointer) cast into 'usize'
-/// together with a unique ID for protection.
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub struct InstanceHandle(usize, i64);
 
-/// Create handle from reference
-impl From<&mut NarraInstance> for InstanceHandle {
-    fn from(instance: &mut NarraInstance) -> Self {
-        Self::new(instance)
+use rlua::{UserData, UserDataMethods};
+
+pub struct NarraInstanceHandle(pub *mut NarraInstance);
+unsafe impl Send for NarraInstanceHandle {}
+impl UserData for NarraInstanceHandle {
+    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method_mut("jump", |_, this, jump_to: String| {
+            Ok(unsafe { this.0.as_mut().unwrap().perform_jump(jump_to) })
+        });
+
+        methods.add_method("seen", |_, this, action_id: String| {
+            Ok(unsafe { this.0.as_mut().unwrap().state.seen_action(action_id) })
+        });
+
+        methods.add_method_mut("set_block", |_, this, val: bool| {
+            Ok(unsafe { this.0.as_mut().unwrap().blocked = val })
+        });
+
+        methods.add_method("is_blocked", |_, this, def: bool| {
+            Ok(unsafe { this.0.as_mut().unwrap().blocked })
+        });
     }
-}
-
-/// Recover reference from handle
-impl AsMut<NarraInstance> for InstanceHandle {
-    fn as_mut(&mut self) -> &mut NarraInstance {
-        unsafe { std::mem::transmute(self.0) }
-    }
-}
-
-impl InstanceHandle {
-    /// Create handle from reference, using a random number as unique ID
-    pub fn new(world: &mut NarraInstance) -> Self {
-        let handle = unsafe { std::mem::transmute(world) };
-        let unique_id = rand::random();
-
-        Self(handle, unique_id)
-    }
-
-    /// Get the unique ID of this instance
-    pub fn unique_id(&self) -> i64 {
-        self.1
-    }
-}
-
-use rhai::plugin::*;
-/// API for handle to 'World'
-#[export_module]
-pub mod handle_module {
-    use rhai::NativeCallContext;
-
-    use super::InstanceHandle;
-
-    pub type Handle = InstanceHandle;
-
-    /// Draw a bunch of pretty shapes.
-    #[rhai_fn(return_raw)]
-    pub fn jump(
-        context: NativeCallContext,
-        handle: &mut Handle,
-        jump_to: String,
-    ) -> Result<(), Box<EvalAltResult>> {
-        // Double check the pointer is still fresh
-        // by comparing the handle's unique ID with
-        // the version stored in the engine's tag!
-        // if handle.unique_id() != context.tag().unwrap().as_int().unwrap() {
-        //     return "Ouch! The handle is stale!".into();
-        // }
-
-        // Get the reference to 'World'
-        let ninst: &mut NarraInstance = handle.as_mut();
-
-        // ... work with reference
-        ninst.perform_jump(jump_to);
-
-        Ok(())
-    }
-
-    #[rhai_fn(return_raw)]
-    pub fn seen(
-        context: NativeCallContext,
-        handle: &mut Handle,
-        id: String,
-    ) -> Result<bool, Box<EvalAltResult>> {
-        // Double check the pointer is still fresh
-        // by comparing the handle's unique ID with
-        // the version stored in the engine's tag!
-        // if handle.unique_id() != context.tag().unwrap().as_int().unwrap() {
-        //     return "Ouch! The handle is stale!".into();
-        // }
-
-        // Get the reference to 'World'
-        let ninst: &mut NarraInstance = handle.as_mut();
-
-        // ... work with reference
-        let r = ninst.state.seen_action(id);
-
-        Ok(r)
-    }
-}
-
-pub fn register_narra_extern(engine: &mut rhai::Engine) {
-    engine.register_global_module(exported_module!(handle_module).into());
 }

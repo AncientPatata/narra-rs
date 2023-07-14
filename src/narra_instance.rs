@@ -1,7 +1,6 @@
 use serde_json as json;
 
 use crate::narra_state::NarraState;
-
 pub struct NarraInstance {
     pub action_stack: Vec<json::Value>,
     pub current_tree: String,
@@ -18,7 +17,7 @@ impl NarraInstance {
             narra_tree: narra_json.clone(),
             action_stack: Vec::<json::Value>::new(),
             end_of_file: false,
-            blocked: true,
+            blocked: false,
             state: NarraState::new(),
         };
         for obj in narra_json.as_array().unwrap() {
@@ -75,3 +74,11 @@ impl Clone for NarraInstance {
         }
     }
 }
+pub type MutexNarraInstance = std::sync::Mutex<std::rc::Rc<std::cell::RefCell<NarraInstance>>>;
+
+pub struct SharedNarraInstanceWrapper {
+    pub instance: MutexNarraInstance,
+}
+
+unsafe impl Send for SharedNarraInstanceWrapper {}
+unsafe impl Sync for SharedNarraInstanceWrapper {}

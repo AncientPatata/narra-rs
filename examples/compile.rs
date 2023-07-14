@@ -17,7 +17,7 @@ where
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
-    // Get declaration :
+    // Get declaration and includes:
     let mut generated_script = "".to_string();
 
     let declare_re = Regex::new(r"(?s)@declare\s*<<(.*?)>>").unwrap();
@@ -25,6 +25,31 @@ where
         let code = &cap[1];
 
         generated_script += code;
+
+        content = content.replace(&cap[0], "");
+    }
+
+    let include_re = Regex::new(r"(?s)@include\s*<<(.*?)>>").unwrap();
+    for cap in include_re.captures_iter(&content.clone()) {
+        let code = &cap[1];
+        let contents = fs::read_to_string(Path::join(
+            filename.as_ref().parent().unwrap(),
+            Path::new(code),
+        ))
+        .map_err(|e| {
+            format!(
+                "Got file name : {code}, failed because of {e}, current dir is : {}",
+                filename
+                    .as_ref()
+                    .parent()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            )
+        })
+        .unwrap();
+        generated_script += contents.as_str();
 
         content = content.replace(&cap[0], "");
     }

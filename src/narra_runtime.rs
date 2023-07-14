@@ -1,18 +1,21 @@
+use crate::lua_serialize::*;
 use crate::narra_extern;
 use crate::narra_front::NarraEventHandler;
 use crate::narra_instance;
+use crate::narra_instance::SharedNarraInstanceWrapper;
 use crate::narra_state;
 
-use narra_extern::{register_narra_extern, InstanceHandle};
+use narra_extern::*;
 use narra_instance::NarraInstance;
 use narra_state::NarraState;
-use rhai::Dynamic;
+use rlua;
+use rlua::LightUserData;
+use rlua::{Function, Lua, MetaMethod, Result, UserData, UserDataMethods, Variadic};
 use serde_json as json;
 
+use std::os::raw::c_void;
+use std::sync::Mutex;
 use std::{cell::RefCell, rc::Rc};
-//use std::fs::{self, File};
-// rhai
-use rhai::{Engine, Scope, AST};
 
 // TODO : Uniquely hash choice texts to track choices that were made ? use a #id modifier to assign a custom id to a choice which is then mapped to the hashed value.
 
@@ -29,9 +32,7 @@ where
     //user_event: bool,
     // Code vars
     event_handler: Rc<RefCell<T>>,
-    pub engine: Engine, // Engine for the Rhai document.
-    scope: Scope<'static>,
-    rhai_ast: AST,
+    pub lua: Lua, // Engine for the Rhai document.
 }
 
 impl<T> NarraRuntime<T>
@@ -43,27 +44,25 @@ where
             instance: NarraInstance::new(),
 
             event_handler: narra_event_handler,
-            engine: Engine::new(),
-            scope: Scope::new(),
-            rhai_ast: AST::default(),
+            lua: Lua::new(),
+
             currently_handled_action: json::Value::Null,
         }
     }
 
     pub fn init(&mut self) {
-        self.engine
-            .register_type_with_name::<NarraInstance>("Script");
-        let handle: InstanceHandle = InstanceHandle::from(&mut self.instance);
-        register_narra_extern(&mut self.engine);
-        self.scope.push("script", handle);
-        self.engine.register_fn("jump", NarraInstance::perform_jump);
-        self.engine
-            .eval_ast_with_scope::<()>(&mut self.scope, &self.rhai_ast)
-            .unwrap();
+        // let wrapper = SharedNarraInstanceWrapper {
+        //     instance: Mutex::new(Rc::new(RefCell::new(self.instance))),
+        // };
+        let instance_ptr = NarraInstanceHandle(&mut self.instance as *mut NarraInstance);
+        self.lua.context(|ctx| {
+            let user_data = ctx.create_userdata(instance_ptr).unwrap();
+            ctx.globals().set("script", user_data);
+        });
     }
 
-    pub fn add_plugin(&mut self, callback: fn(&mut Engine)) {
-        callback(&mut self.engine);
+    pub fn add_plugin(&mut self, callback: fn(&mut Lua)) {
+        callback(&mut self.lua);
     }
 
     pub fn set_narra_state(&mut self, new_state: NarraState) {
@@ -78,10 +77,10 @@ where
         let split_file = narra_file.split("<<--SPLIT-->>").collect::<Vec<&str>>();
         let json_tree: json::Value = json::from_str(&split_file[1]).unwrap();
         self.instance = NarraInstance::from_json(&json_tree);
-        self.rhai_ast = self
-            .engine
-            .compile_with_scope(&mut self.scope, &split_file[0])
-            .unwrap();
+        self.lua.context(|ctx| {
+            let chunk = ctx.load(&split_file[0]);
+            chunk.exec();
+        });
     }
 
     fn handle_choices(&mut self, choice_action: json::Value) {
@@ -130,12 +129,14 @@ where
 
     fn handle_eval(&mut self, eval_action: json::Value) {
         //println!("EVAL : \n {eval_action} \n");
-        let func_name = eval_action["action"]["eval_value"]["func_id"]
+        let code = eval_action["action"]["eval_value"]["func_id"]
             .as_str()
             .unwrap();
-        self.engine
-            .eval_with_scope::<()>(&mut self.scope, func_name)
-            .unwrap();
+        println!("EVAL ACTION : {code}");
+        self.lua.context(|ctx| {
+            let chunk = ctx.load(code);
+            chunk.exec();
+        })
     }
 
     fn handle_value(&mut self, value: &json::Value) -> json::Value
@@ -155,21 +156,16 @@ where
                 json::Value::String(val)
             }
             "eval" => {
-                let v = self
-                    .engine
-                    .eval_with_scope::<Dynamic>(&mut self.scope, value["func_id"].as_str().unwrap())
+                let val = self
+                    .lua
+                    .context::<_, rlua::Result<json::Value>>(|ctx| {
+                        let chunk = ctx.load(value["func_id"].as_str().unwrap());
+                        println!("CODE : {}", value["func_id"].as_str().unwrap());
+                        let v = chunk.eval::<JsonWrapperValue>().unwrap();
+                        Ok(v.into())
+                    })
                     .unwrap();
-                if v.is_int() {
-                    json::json!(v.as_int().unwrap())
-                } else if v.is_string() {
-                    json::json!(v.into_string().unwrap())
-                } else if v.is_bool() {
-                    json::json!(v.as_bool().unwrap())
-                } else if v.is_float() {
-                    json::json!(v.as_float().unwrap())
-                } else {
-                    json::Value::Null
-                }
+                val
             }
             _ => json::Value::Null,
         }
@@ -203,8 +199,10 @@ where
     }
 
     pub fn handle_action(&mut self) {
+        // println!("BLOCKED ?{}", self.instance.blocked);
         if !self.instance.blocked {
             let action = self.instance.action_stack.pop().unwrap();
+            // println!("ACTION : {}", action);
             self.currently_handled_action = action.clone();
             self.instance
                 .state
